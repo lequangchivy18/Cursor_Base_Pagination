@@ -20,19 +20,29 @@
     </select>
 
     <!-- Lấy trang tiếp theo -->
-    <select id="findNextPage" resultType="com.example.cursorbasepagination.entity.Post">
-        SELECT * FROM posts
+    <select id="findNextPage" resultMap="PostResultMap">
+        SELECT id, title, content, created_at, user_id
+        FROM posts
         WHERE (created_at &lt; #{lastCreatedAt}) OR (created_at = #{lastCreatedAt} AND id &lt; #{lastId})
         ORDER BY created_at DESC, id DESC
-        LIMIT #{limit}
+            LIMIT #{limit}
     </select>
 
     <!-- Lấy trang trước đó (lưu ý: trả về ngược, sẽ bị đảo lại trong service) -->
-    <select id="findPreviousPage" resultType="com.example.cursorbasepagination.entity.Post">
-        SELECT * FROM posts
+    <select id="findPreviousPage" resultMap="PostResultMap">
+        SELECT id, title, content, created_at, user_id
+        FROM posts
         WHERE (created_at > #{firstCreatedAt}) OR (created_at = #{firstCreatedAt} AND id > #{firstId})
         ORDER BY created_at ASC, id ASC
             LIMIT #{limit}
+    </select>
+
+    <!-- Kiểm tra xem có trang trước không -->
+    <select id="checkHasPrevious" resultType="Integer">
+        SELECT COUNT(*)
+        FROM posts
+        WHERE (created_at > #{firstCreatedAt}) OR (created_at = #{firstCreatedAt} AND id > #{firstId})
+            LIMIT 1
     </select>
 
     <!-- Thêm truy vấn với điều kiện lọc -->
