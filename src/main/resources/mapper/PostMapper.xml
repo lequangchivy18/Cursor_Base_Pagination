@@ -9,11 +9,47 @@
         <result column="content" property="content" />
         <result column="created_at" property="createdAt" />
         <result column="user_id" property="userId" />
+        <result column="category" property="category" />
     </resultMap>
+
+    <!-- SQL Fragments để tái sử dụng -->
+    <sql id="baseCursor">
+        <if test="lastId != null and lastCreatedAt != null">
+            AND ((created_at &lt; #{lastCreatedAt})
+            OR (created_at = #{lastCreatedAt} AND id &lt; #{lastId}))
+        </if>
+    </sql>
+
+    <sql id="previousCursor">
+        <if test="firstId != null and firstCreatedAt != null">
+            AND ((created_at > #{firstCreatedAt})
+            OR (created_at = #{firstCreatedAt} AND id > #{firstId}))
+        </if>
+    </sql>
+
+    <sql id="baseWhere">
+        <where>
+            <if test="title != null and title != ''">
+                AND title LIKE '%' || #{title} || '%'
+            </if>
+            <if test="category != null and category != ''">
+                AND category = #{category}
+            </if>
+            <if test="userId != null">
+                AND user_id = #{userId}
+            </if>
+            <if test="startDate != null">
+                AND created_at >= #{startDate}
+            </if>
+            <if test="endDate != null">
+                AND created_at &lt;= #{endDate}
+            </if>
+        </where>
+    </sql>
 
     <!-- Lấy trang đầu tiên -->
     <select id="findFirstPage" resultMap="PostResultMap">
-        SELECT id, title, content, created_at, user_id
+        SELECT id, title, content, created_at, user_id, category
         FROM posts
         ORDER BY created_at DESC, id DESC
             LIMIT #{limit}
@@ -21,7 +57,7 @@
 
     <!-- Lấy trang tiếp theo -->
     <select id="findNextPage" resultMap="PostResultMap">
-        SELECT id, title, content, created_at, user_id
+        SELECT id, title, content, created_at, user_id, category
         FROM posts
         WHERE (created_at &lt; #{lastCreatedAt}) OR (created_at = #{lastCreatedAt} AND id &lt; #{lastId})
         ORDER BY created_at DESC, id DESC
@@ -30,7 +66,7 @@
 
     <!-- Lấy trang trước đó (lưu ý: trả về ngược, sẽ bị đảo lại trong service) -->
     <select id="findPreviousPage" resultMap="PostResultMap">
-        SELECT id, title, content, created_at, user_id
+        SELECT id, title, content, created_at, user_id, category
         FROM posts
         WHERE (created_at > #{firstCreatedAt}) OR (created_at = #{firstCreatedAt} AND id > #{firstId})
         ORDER BY created_at ASC, id ASC
@@ -45,42 +81,79 @@
             LIMIT 1
     </select>
 
-    <!-- Thêm truy vấn với điều kiện lọc -->
-    <select id="findByCategory" resultMap="PostResultMap">
-        SELECT id, title, content, created_at, user_id
+    <!-- Lấy trang đầu tiên với filter category -->
+    <select id="findByCategoryFirstPage" resultMap="PostResultMap">
+        SELECT id, title, content, created_at, user_id, category
         FROM posts
         WHERE category = #{category}
-        <if test="lastId != null and lastCreatedAt != null">
-            AND ((created_at &lt; #{lastCreatedAt})
-            OR (created_at = #{lastCreatedAt} AND id &lt; #{lastId}))
-        </if>
+        ORDER BY created_at DESC, id DESC
+            LIMIT #{limit}
+    </select>
+
+    <!-- Lấy trang tiếp theo với filter category -->
+    <select id="findByCategoryNextPage" resultMap="PostResultMap">
+        SELECT id, title, content, created_at, user_id, category
+        FROM posts
+        WHERE category = #{category}
+        <include refid="baseCursor" />
         ORDER BY created_at DESC, id DESC
         LIMIT #{limit}
     </select>
 
-    <!-- Query với nhiều điều kiện phức tạp -->
-    <select id="findWithFilters" resultMap="PostResultMap">
-        SELECT id, title, content, created_at, user_id
+    <!-- Lấy trang trước đó với filter category -->
+    <select id="findByCategoryPreviousPage" resultMap="PostResultMap">
+        SELECT id, title, content, created_at, user_id, category
         FROM posts
-        <where>
-            <if test="category != null">
-                category = #{category}
-            </if>
-            <if test="userId != null">
-                AND user_id = #{userId}
-            </if>
-            <if test="startDate != null">
-                AND created_at >= #{startDate}
-            </if>
-            <if test="endDate != null">
-                AND created_at &lt;= #{endDate}
-            </if>
-            <if test="lastId != null and lastCreatedAt != null">
-                AND ((created_at &lt; #{lastCreatedAt})
-                OR (created_at = #{lastCreatedAt} AND id &lt; #{lastId}))
-            </if>
-        </where>
+        WHERE category = #{category}
+        <include refid="previousCursor" />
+        ORDER BY created_at ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <!-- Lấy trang đầu tiên với nhiều điều kiện phức tạp -->
+    <select id="findWithFiltersFirstPage" resultMap="PostResultMap">
+        SELECT id, title, content, created_at, user_id, category
+        FROM posts
+        <include refid="baseWhere" />
         ORDER BY created_at DESC, id DESC
         LIMIT #{limit}
+    </select>
+
+    <!-- Lấy trang tiếp theo với nhiều điều kiện phức tạp -->
+    <select id="findWithFiltersNextPage" resultMap="PostResultMap">
+        SELECT id, title, content, created_at, user_id, category
+        FROM posts
+        <include refid="baseWhere" />
+        <include refid="baseCursor" />
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- Lấy trang trước đó với nhiều điều kiện phức tạp -->
+    <select id="findWithFiltersPreviousPage" resultMap="PostResultMap">
+        SELECT id, title, content, created_at, user_id, category
+        FROM posts
+        <include refid="baseWhere" />
+        <include refid="previousCursor" />
+        ORDER BY created_at ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <!-- Kiểm tra xem có trang trước cho category không -->
+    <select id="checkHasPreviousCategory" resultType="Integer">
+        SELECT COUNT(*)
+        FROM posts
+        WHERE category = #{category}
+        <include refid="previousCursor" />
+        LIMIT 1
+    </select>
+
+    <!-- Kiểm tra xem có trang trước cho filters không -->
+    <select id="checkHasPreviousFilters" resultType="Integer">
+        SELECT COUNT(*)
+        FROM posts
+        <include refid="baseWhere" />
+        <include refid="previousCursor" />
+        LIMIT 1
     </select>
 </mapper>

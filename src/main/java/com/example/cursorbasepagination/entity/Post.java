@@ -8,6 +8,7 @@ public class Post {
     private String content;
     private Date createdAt;
     private Long userId;
+    private String category;
 
     // Getters and Setters
     public Long getId() {
@@ -48,5 +49,13 @@ public class Post {
 
     public void setUserId(Long userId) {
         this.userId = userId;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
     }
 }

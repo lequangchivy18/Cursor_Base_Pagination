@@ -16,21 +16,19 @@ public interface PostMapper {
 
     /**
      * Lấy trang đầu tiên của danh sách bài viết.
-     * Kết quả được sắp xếp theo thứ tự giảm dần của thời gian tạo và ID.
      *
-     * @param limit Số lượng bài viết tối đa cần lấy
-     * @return Danh sách bài viết trang đầu tiên
+     * @param limit số lượng bài viết tối đa trả về
+     * @return danh sách bài viết trang đầu tiên
      */
     List<Post> findFirstPage(@Param("limit") int limit);
 
     /**
-     * Lấy trang tiếp theo dựa trên cursor (ID và thời gian tạo của bài viết cuối cùng).
-     * Kết quả được sắp xếp theo thứ tự giảm dần của thời gian tạo và ID.
+     * Lấy trang tiếp theo dựa trên cursor.
      *
      * @param lastId ID của bài viết cuối cùng trong trang hiện tại
-     * @param lastCreatedAt Thời gian tạo của bài viết cuối cùng trong trang hiện tại
-     * @param limit Số lượng bài viết tối đa cần lấy
-     * @return Danh sách bài viết của trang tiếp theo
+     * @param lastCreatedAt ngày tạo của bài viết cuối cùng trong trang hiện tại
+     * @param limit số lượng bài viết tối đa trả về
+     * @return danh sách bài viết của trang tiếp theo
      */
     List<Post> findNextPage(
             @Param("lastId") Long lastId,
@@ -38,14 +36,12 @@ public interface PostMapper {
             @Param("limit") int limit);
 
     /**
-     * Lấy trang trước đó dựa trên cursor (ID và thời gian tạo của bài viết đầu tiên).
-     * Kết quả được sắp xếp theo thứ tự tăng dần của thời gian tạo và ID.
-     * Lưu ý: Kết quả trả về sẽ cần đảo ngược trước khi sử dụng.
+     * Lấy trang trước đó dựa trên cursor.
      *
      * @param firstId ID của bài viết đầu tiên trong trang hiện tại
-     * @param firstCreatedAt Thời gian tạo của bài viết đầu tiên trong trang hiện tại
-     * @param limit Số lượng bài viết tối đa cần lấy
-     * @return Danh sách bài viết của trang trước đó (theo thứ tự tăng dần)
+     * @param firstCreatedAt ngày tạo của bài viết đầu tiên trong trang hiện tại
+     * @param limit số lượng bài viết tối đa trả về
+     * @return danh sách bài viết của trang trước đó
      */
     List<Post> findPreviousPage(
             @Param("firstId") Long firstId,
@@ -53,46 +49,104 @@ public interface PostMapper {
             @Param("limit") int limit);
 
     /**
-     * Kiểm tra xem có trang trước đó hay không dựa trên cursor hiện tại.
+     * Kiểm tra xem có trang trước đó hay không.
      *
      * @param firstId ID của bài viết đầu tiên trong trang hiện tại
-     * @param firstCreatedAt Thời gian tạo của bài viết đầu tiên trong trang hiện tại
-     * @return 0 nếu không có trang trước, > 0 nếu có trang trước
+     * @param firstCreatedAt ngày tạo của bài viết đầu tiên trong trang hiện tại
+     * @return 1 nếu có trang trước, 0 nếu không có
      */
     Integer checkHasPrevious(
             @Param("firstId") Long firstId,
             @Param("firstCreatedAt") Date firstCreatedAt);
 
     /**
-     * Lấy danh sách bài viết theo category với cơ chế cursor-based pagination.
-     * Kết quả được sắp xếp theo thứ tự giảm dần của thời gian tạo và ID.
+     * Lấy trang đầu tiên theo category.
      *
-     * @param category Tên category cần lọc
-     * @param lastId ID của bài viết cuối cùng trong trang hiện tại (null nếu là trang đầu tiên)
-     * @param lastCreatedAt Thời gian tạo của bài viết cuối cùng trong trang hiện tại (null nếu là trang đầu tiên)
-     * @param limit Số lượng bài viết tối đa cần lấy
-     * @return Danh sách bài viết theo category
+     * @param category danh mục cần lọc
+     * @param limit số lượng bài viết tối đa trả về
+     * @return danh sách bài viết trang đầu tiên theo danh mục
      */
-    List<Post> findByCategory(
+    List<Post> findByCategoryFirstPage(
+            @Param("category") String category,
+            @Param("limit") int limit);
+
+    /**
+     * Lấy trang tiếp theo theo category.
+     *
+     * @param category danh mục cần lọc
+     * @param lastId ID của bài viết cuối cùng trong trang hiện tại
+     * @param lastCreatedAt ngày tạo của bài viết cuối cùng trong trang hiện tại
+     * @param limit số lượng bài viết tối đa trả về
+     * @return danh sách bài viết của trang tiếp theo theo danh mục
+     */
+    List<Post> findByCategoryNextPage(
             @Param("category") String category,
             @Param("lastId") Long lastId,
             @Param("lastCreatedAt") Date lastCreatedAt,
             @Param("limit") int limit);
 
     /**
-     * Lấy danh sách bài viết với nhiều điều kiện lọc kết hợp.
-     * Kết quả được sắp xếp theo thứ tự giảm dần của thời gian tạo và ID.
+     * Lấy trang trước đó theo category.
      *
-     * @param category Category cần lọc (có thể null)
-     * @param userId ID của người dùng cần lọc (có thể null)
-     * @param startDate Thời gian bắt đầu khoảng thời gian cần lọc (có thể null)
-     * @param endDate Thời gian kết thúc khoảng thời gian cần lọc (có thể null)
-     * @param lastId ID của bài viết cuối cùng trong trang hiện tại (null nếu là trang đầu tiên)
-     * @param lastCreatedAt Thời gian tạo của bài viết cuối cùng trong trang hiện tại (null nếu là trang đầu tiên)
-     * @param limit Số lượng bài viết tối đa cần lấy
-     * @return Danh sách bài viết thỏa mãn các điều kiện lọc
+     * @param category danh mục cần lọc
+     * @param firstId ID của bài viết đầu tiên trong trang hiện tại
+     * @param firstCreatedAt ngày tạo của bài viết đầu tiên trong trang hiện tại
+     * @param limit số lượng bài viết tối đa trả về
+     * @return danh sách bài viết của trang trước đó theo danh mục
      */
-    List<Post> findWithFilters(
+    List<Post> findByCategoryPreviousPage(
+            @Param("category") String category,
+            @Param("firstId") Long firstId,
+            @Param("firstCreatedAt") Date firstCreatedAt,
+            @Param("limit") int limit);
+
+    /**
+     * Kiểm tra xem có trang trước đó không theo category.
+     *
+     * @param category danh mục cần lọc
+     * @param firstId ID của bài viết đầu tiên trong trang hiện tại
+     * @param firstCreatedAt ngày tạo của bài viết đầu tiên trong trang hiện tại
+     * @return 1 nếu có trang trước, 0 nếu không có
+     */
+    Integer checkHasPreviousCategory(
+            @Param("category") String category,
+            @Param("firstId") Long firstId,
+            @Param("firstCreatedAt") Date firstCreatedAt);
+
+    /**
+     * Lấy trang đầu tiên với nhiều điều kiện lọc.
+     *
+     * @param title tiêu đề cần lọc (có thể null)
+     * @param category danh mục cần lọc (có thể null)
+     * @param userId ID người dùng cần lọc (có thể null)
+     * @param startDate ngày bắt đầu của khoảng thời gian cần lọc (có thể null)
+     * @param endDate ngày kết thúc của khoảng thời gian cần lọc (có thể null)
+     * @param limit số lượng bài viết tối đa trả về
+     * @return danh sách bài viết trang đầu tiên với các điều kiện lọc
+     */
+    List<Post> findWithFiltersFirstPage(
+            @Param("title") String title,
+            @Param("category") String category,
+            @Param("userId") Long userId,
+            @Param("startDate") Date startDate,
+            @Param("endDate") Date endDate,
+            @Param("limit") int limit);
+
+    /**
+     * Lấy trang tiếp theo với nhiều điều kiện lọc.
+     *
+     * @param title tiêu đề cần lọc (có thể null)
+     * @param category danh mục cần lọc (có thể null)
+     * @param userId ID người dùng cần lọc (có thể null)
+     * @param startDate ngày bắt đầu của khoảng thời gian cần lọc (có thể null)
+     * @param endDate ngày kết thúc của khoảng thời gian cần lọc (có thể null)
+     * @param lastId ID của bài viết cuối cùng trong trang hiện tại
+     * @param lastCreatedAt ngày tạo của bài viết cuối cùng trong trang hiện tại
+     * @param limit số lượng bài viết tối đa trả về
+     * @return danh sách bài viết của trang tiếp theo với các điều kiện lọc
+     */
+    List<Post> findWithFiltersNextPage(
+            @Param("title") String title,
             @Param("category") String category,
             @Param("userId") Long userId,
             @Param("startDate") Date startDate,
@@ -100,4 +154,48 @@ public interface PostMapper {
             @Param("lastId") Long lastId,
             @Param("lastCreatedAt") Date lastCreatedAt,
             @Param("limit") int limit);
+
+    /**
+     * Lấy trang trước đó với nhiều điều kiện lọc.
+     *
+     * @param title tiêu đề cần lọc (có thể null)
+     * @param category danh mục cần lọc (có thể null)
+     * @param userId ID người dùng cần lọc (có thể null)
+     * @param startDate ngày bắt đầu của khoảng thời gian cần lọc (có thể null)
+     * @param endDate ngày kết thúc của khoảng thời gian cần lọc (có thể null)
+     * @param firstId ID của bài viết đầu tiên trong trang hiện tại
+     * @param firstCreatedAt ngày tạo của bài viết đầu tiên trong trang hiện tại
+     * @param limit số lượng bài viết tối đa trả về
+     * @return danh sách bài viết của trang trước đó với các điều kiện lọc
+     */
+    List<Post> findWithFiltersPreviousPage(
+            @Param("title") String title,
+            @Param("category") String category,
+            @Param("userId") Long userId,
+            @Param("startDate") Date startDate,
+            @Param("endDate") Date endDate,
+            @Param("firstId") Long firstId,
+            @Param("firstCreatedAt") Date firstCreatedAt,
+            @Param("limit") int limit);
+
+    /**
+     * Kiểm tra xem có trang trước đó không với các điều kiện lọc.
+     *
+     * @param title tiêu đề cần lọc (có thể null)
+     * @param category danh mục cần lọc (có thể null)
+     * @param userId ID người dùng cần lọc (có thể null)
+     * @param startDate ngày bắt đầu của khoảng thời gian cần lọc (có thể null)
+     * @param endDate ngày kết thúc của khoảng thời gian cần lọc (có thể null)
+     * @param firstId ID của bài viết đầu tiên trong trang hiện tại
+     * @param firstCreatedAt ngày tạo của bài viết đầu tiên trong trang hiện tại
+     * @return 1 nếu có trang trước, 0 nếu không có
+     */
+    Integer checkHasPreviousFilters(
+            @Param("title") String title,
+            @Param("category") String category,
+            @Param("userId") Long userId,
+            @Param("startDate") Date startDate,
+            @Param("endDate") Date endDate,
+            @Param("firstId") Long firstId,
+            @Param("firstCreatedAt") Date firstCreatedAt);
 }

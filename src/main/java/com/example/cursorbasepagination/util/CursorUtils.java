@@ -1,11 +1,12 @@
 package com.example.cursorbasepagination.util;
 
+import com.example.cursorbasepagination.dto.request.CursorPageRequest;
+import com.example.cursorbasepagination.dto.response.CursorPageResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Lớp tiện ích cho phân trang dựa trên cursor.
@@ -116,5 +117,131 @@ public class CursorUtils<T> {
         }
 
         return transformers;
+    }
+
+    /**
+     * Helper method để xử lý cursor-based pagination với bất kỳ kiểu query nào.
+     * Phương thức này giúp tổng quát hóa logic phân trang cho nhiều loại truy vấn khác nhau.
+     *
+     * @param <T> Kiểu dữ liệu của entity đang được phân trang
+     * @param pageRequest Request chứa thông tin phân trang
+     * @param firstPageSupplier Supplier để lấy trang đầu tiên
+     * @param nextPageSupplier Supplier để lấy trang tiếp theo
+     * @param previousPageSupplier Supplier để lấy trang trước đó
+     * @param checkHasPreviousSupplier Supplier để kiểm tra có trang trước không
+     * @param cursorFieldsExtractor Hàm để trích xuất các trường cursor từ entity
+     * @return CursorPageResponse chứa kết quả phân trang
+     */
+    public static <T> CursorPageResponse<T> handlePagination(
+            CursorPageRequest pageRequest,
+            Supplier<List<T>> firstPageSupplier,
+            Supplier<List<T>> nextPageSupplier,
+            Supplier<List<T>> previousPageSupplier,
+            Supplier<Integer> checkHasPreviousSupplier,
+            Function<T, Map<String, Object>> cursorFieldsExtractor) {
+
+        // Xử lý input
+        if (pageRequest.getLimit() == null || pageRequest.getLimit() <= 0) {
+            pageRequest.setLimit(10);
+        }
+
+        List<T> entities;
+        boolean hasNext = false;
+        boolean hasPrevious = false;
+        CursorUtils<T> cursorUtils = new CursorUtils<>();
+
+        // Tạo transformer cho trường createdAt
+        Map<String, Function<Object, Object>> transformers = CursorUtils.createDateTransformers("createdAt");
+
+        // Xử lý trang đầu tiên hoặc trang có cursor
+        if (pageRequest.isFirstPage() || pageRequest.getCursor() == null) {
+            // Lấy trang đầu tiên
+            entities = firstPageSupplier.get();
+
+            // Kiểm tra có trang tiếp theo không
+            hasNext = entities.size() > pageRequest.getLimit();
+
+            // Trang đầu tiên không có trang trước
+            hasPrevious = false;
+
+            // Loại bỏ phần tử thừa nếu có
+            if (hasNext) {
+                entities = entities.subList(0, pageRequest.getLimit());
+            }
+        } else {
+            // Giải mã cursor
+            Map<String, Object> cursorData = cursorUtils.decodeCursor(pageRequest.getCursor(), transformers);
+
+            if (cursorData != null) {
+                if (pageRequest.isNextDirection()) {
+                    // Lấy trang tiếp theo
+                    entities = nextPageSupplier.get();
+
+                    // Kiểm tra có trang tiếp theo không
+                    hasNext = entities.size() > pageRequest.getLimit();
+
+                    // Kiểm tra có trang trước không (sử dụng các trường từ cursor)
+                    hasPrevious = true;
+
+                    // Loại bỏ phần tử thừa nếu có
+                    if (hasNext) {
+                        entities = entities.subList(0, pageRequest.getLimit());
+                    }
+                } else {
+                    // Lấy trang trước đó
+                    entities = previousPageSupplier.get();
+
+                    // Kiểm tra có trang trước nữa không
+                    hasPrevious = entities.size() > pageRequest.getLimit();
+
+                    // Loại bỏ phần tử thừa nếu có
+                    if (hasPrevious) {
+                        entities = entities.subList(0, pageRequest.getLimit());
+                    }
+
+                    // Kiểm tra có trang tiếp theo không (sử dụng checkHasPrevious)
+                    hasNext = true;
+
+                    // Đảo ngược danh sách vì SQL truy vấn theo thứ tự tăng dần
+                    Collections.reverse(entities);
+                }
+            } else {
+                // Nếu không thể giải mã cursor, trả về trang đầu tiên
+                entities = firstPageSupplier.get();
+
+                // Kiểm tra có trang tiếp theo không
+                hasNext = entities.size() > pageRequest.getLimit();
+
+                // Trang đầu tiên không có trang trước
+                hasPrevious = false;
+
+                // Loại bỏ phần tử thừa nếu có
+                if (hasNext) {
+                    entities = entities.subList(0, pageRequest.getLimit());
+                }
+            }
+        }
+
+        // Tạo nextCursor và previousCursor
+        String nextCursor = null;
+        String previousCursor = null;
+
+        if (!entities.isEmpty()) {
+            // Lấy phần tử đầu tiên và cuối cùng
+            T firstT = entities.get(0);
+            T lastT = entities.get(entities.size() - 1);
+
+            // Tạo nextCursor từ phần tử cuối cùng nếu có trang tiếp theo
+            if (hasNext) {
+                nextCursor = cursorUtils.encodeCursor(lastT, cursorFieldsExtractor);
+            }
+
+            // Tạo previousCursor từ phần tử đầu tiên nếu có trang trước
+            if (hasPrevious) {
+                previousCursor = cursorUtils.encodeCursor(firstT, cursorFieldsExtractor);
+            }
+        }
+
+        return new CursorPageResponse<>(entities, nextCursor, previousCursor, hasNext, hasPrevious);
     }
 }

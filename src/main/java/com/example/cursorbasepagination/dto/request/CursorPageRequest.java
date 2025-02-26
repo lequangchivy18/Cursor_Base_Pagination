@@ -11,7 +11,7 @@ public class CursorPageRequest {
 
     // Enum để chỉ định hướng điều hướng
     public enum PaginationDirection {
-        NEXT, PREVIOUS
+            NEXT, PREVIOUS
     }
 
     public CursorPageRequest() {

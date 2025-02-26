@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 @Service
 public class PostServiceImpl implements PostService {
@@ -18,293 +19,139 @@ public class PostServiceImpl implements PostService {
     @Autowired
     private PostMapper postMapper;
 
+    // Định nghĩa hàm extractor để lấy các trường cần thiết từ Post entity
+    private Function<Post, Map<String, Object>> cursorFieldsExtractor = post -> {
+        Map<String, Object> cursorFields = new HashMap<>();
+        cursorFields.put("id", post.getId());
+        cursorFields.put("createdAt", post.getCreatedAt());
+        return cursorFields;
+    };
+
     @Override
     public CursorPageResponse<Post> getPosts(CursorPageRequest pageRequest) {
-        // Xử lý input
-        if (pageRequest.getLimit() == null || pageRequest.getLimit() <= 0) {
-            pageRequest.setLimit(10);
-        }
+        // Xử lý input và tạo limit với +1 để kiểm tra trang tiếp theo
+        int limit = (pageRequest.getLimit() != null && pageRequest.getLimit() > 0)
+                ? pageRequest.getLimit() + 1 : 11;
 
-        // Tăng limit thêm 1 để kiểm tra có trang tiếp theo không
-        int limit = pageRequest.getLimit() + 1;
+        // Giải mã cursor nếu có
+        Long cursorId = null;
+        Date cursorCreatedAt = null;
 
-        List<Post> posts;
-        boolean hasNext = false;
-        boolean hasPrevious = false;
-        CursorUtils<Post> cursorUtils = new CursorUtils<>();
-
-        // Định nghĩa hàm extractor để lấy các trường cần thiết từ Post entity
-        Function<Post, Map<String, Object>> cursorFieldsExtractor = post -> {
-            Map<String, Object> cursorFields = new HashMap<>();
-            cursorFields.put("id", post.getId());
-            cursorFields.put("createdAt", post.getCreatedAt());
-            return cursorFields;
-        };
-
-        // Tạo transformer cho trường createdAt
-        Map<String, Function<Object, Object>> transformers = CursorUtils.createDateTransformers("createdAt");
-
-        // Xử lý trang đầu tiên hoặc trang có cursor
-        if (pageRequest.isFirstPage()) {
-            // Lấy trang đầu tiên
-            posts = postMapper.findFirstPage(limit);
-
-            // Kiểm tra có trang tiếp theo không
-            hasNext = posts.size() > pageRequest.getLimit();
-
-            // Trang đầu tiên không có trang trước
-            hasPrevious = false;
-
-            // Loại bỏ phần tử thừa nếu có
-            if (hasNext) {
-                posts = posts.subList(0, pageRequest.getLimit());
-            }
-        } else {
-            // Giải mã cursor
+        if (pageRequest.getCursor() != null) {
+            CursorUtils<Post> cursorUtils = new CursorUtils<>();
+            Map<String, Function<Object, Object>> transformers = CursorUtils.createDateTransformers("createdAt");
             Map<String, Object> cursorData = cursorUtils.decodeCursor(pageRequest.getCursor(), transformers);
 
             if (cursorData != null) {
-                Long id = ((Number) cursorData.get("id")).longValue();
-                Date createdAt = (Date) cursorData.get("createdAt");
-
-                if (pageRequest.isNextDirection()) {
-                    // Lấy trang tiếp theo
-                    posts = postMapper.findNextPage(id, createdAt, limit);
-
-                    // Kiểm tra có trang tiếp theo không
-                    hasNext = posts.size() > pageRequest.getLimit();
-
-                    // Kiểm tra có trang trước không (thay vì luôn true)
-                    hasPrevious = true;
-
-                    // Loại bỏ phần tử thừa nếu có
-                    if (hasNext) {
-                        posts = posts.subList(0, pageRequest.getLimit());
-                    }
-                } else {
-                    // Lấy trang trước đó
-                    posts = postMapper.findPreviousPage(id, createdAt, limit);
-
-                    // Kiểm tra có trang trước nữa không
-                    hasPrevious = posts.size() > pageRequest.getLimit();
-
-                    // Loại bỏ phần tử thừa nếu có
-                    if (hasPrevious) {
-                        posts = posts.subList(0, pageRequest.getLimit());
-                    }
-
-                    // Kiểm tra có trang tiếp theo không (thay vì luôn true)
-                    hasNext = true;
-
-                    // Đảo ngược danh sách vì SQL truy vấn theo thứ tự tăng dần
-                    Collections.reverse(posts);
-                }
-            } else {
-                // Nếu không thể giải mã cursor, trả về trang đầu tiên
-                posts = postMapper.findFirstPage(limit);
-
-                // Kiểm tra có trang tiếp theo không
-                hasNext = posts.size() > pageRequest.getLimit();
-
-                // Trang đầu tiên không có trang trước
-                hasPrevious = false;
-
-                // Loại bỏ phần tử thừa nếu có
-                if (hasNext) {
-                    posts = posts.subList(0, pageRequest.getLimit());
-                }
+                cursorId = ((Number) cursorData.get("id")).longValue();
+                cursorCreatedAt = (Date) cursorData.get("createdAt");
             }
         }
 
-        // Tạo nextCursor và previousCursor
-        String nextCursor = null;
-        String previousCursor = null;
+        // Tạo các suppliers cho từng loại truy vấn
+        final Long finalCursorId = cursorId;
+        final Date finalCursorCreatedAt = cursorCreatedAt;
+        final int finalLimit = limit;
 
-        if (!posts.isEmpty()) {
-            // Lấy phần tử đầu tiên và cuối cùng
-            Post firstPost = posts.get(0);
-            Post lastPost = posts.get(posts.size() - 1);
-
-            // Tạo nextCursor từ phần tử cuối cùng nếu có trang tiếp theo
-            if (hasNext) {
-                nextCursor = cursorUtils.encodeCursor(lastPost, cursorFieldsExtractor);
-            }
-
-            // Tạo previousCursor từ phần tử đầu tiên nếu có trang trước
-            if (hasPrevious) {
-                previousCursor = cursorUtils.encodeCursor(firstPost, cursorFieldsExtractor);
-            }
-        }
-
-        return new CursorPageResponse<>(posts, nextCursor, previousCursor, hasNext, hasPrevious);
+        return CursorUtils.handlePagination(
+                pageRequest,
+                // First page supplier
+                () -> postMapper.findFirstPage(finalLimit),
+                // Next page supplier
+                () -> postMapper.findNextPage(finalCursorId, finalCursorCreatedAt, finalLimit),
+                // Previous page supplier
+                () -> postMapper.findPreviousPage(finalCursorId, finalCursorCreatedAt, finalLimit),
+                // Check has previous supplier
+                () -> postMapper.checkHasPrevious(finalCursorId, finalCursorCreatedAt),
+                // Cursor fields extractor
+                cursorFieldsExtractor
+        );
     }
 
     @Override
     public CursorPageResponse<Post> getPostsByCategory(String category, CursorPageRequest pageRequest) {
-        // Xử lý input
-        if (pageRequest.getLimit() == null || pageRequest.getLimit() <= 0) {
-            pageRequest.setLimit(10);
-        }
+        // Xử lý input và tạo limit với +1 để kiểm tra trang tiếp theo
+        int limit = (pageRequest.getLimit() != null && pageRequest.getLimit() > 0)
+                ? pageRequest.getLimit() + 1 : 11;
 
-        // Tăng limit thêm 1 để kiểm tra có trang tiếp theo không
-        int limit = pageRequest.getLimit() + 1;
+        // Giải mã cursor nếu có
+        Long cursorId = null;
+        Date cursorCreatedAt = null;
 
-        List<Post> posts;
-        boolean hasNext = false;
-        boolean hasPrevious = false;
-        CursorUtils<Post> cursorUtils = new CursorUtils<>();
-
-        // Định nghĩa hàm extractor để lấy các trường cần thiết từ Post entity
-        Function<Post, Map<String, Object>> cursorFieldsExtractor = post -> {
-            Map<String, Object> cursorFields = new HashMap<>();
-            cursorFields.put("id", post.getId());
-            cursorFields.put("createdAt", post.getCreatedAt());
-            return cursorFields;
-        };
-
-        // Tạo transformer cho trường createdAt
-        Map<String, Function<Object, Object>> transformers = CursorUtils.createDateTransformers("createdAt");
-
-        // Xử lý cursor nếu có
         if (pageRequest.getCursor() != null) {
+            CursorUtils<Post> cursorUtils = new CursorUtils<>();
+            Map<String, Function<Object, Object>> transformers = CursorUtils.createDateTransformers("createdAt");
             Map<String, Object> cursorData = cursorUtils.decodeCursor(pageRequest.getCursor(), transformers);
 
             if (cursorData != null) {
-                Long id = ((Number) cursorData.get("id")).longValue();
-                Date createdAt = (Date) cursorData.get("createdAt");
-
-                // Lấy posts theo category và cursor
-                posts = postMapper.findByCategory(category, id, createdAt, limit);
-
-                // Kiểm tra có trang tiếp theo không
-                hasNext = posts.size() > pageRequest.getLimit();
-
-                // Kiểm tra có trang trước không
-                if (pageRequest.isNextDirection()) {
-                    hasPrevious = true;
-                } else {
-                    // TODO: Implement logic for previous page with category
-                    hasPrevious = false;
-                }
-
-                // Loại bỏ phần tử thừa nếu có
-                if (hasNext) {
-                    posts = posts.subList(0, pageRequest.getLimit());
-                }
-            } else {
-                // Fallback nếu cursor không hợp lệ
-                posts = postMapper.findByCategory(category, null, null, limit);
-                hasNext = posts.size() > pageRequest.getLimit();
-                hasPrevious = false;
-
-                if (hasNext) {
-                    posts = posts.subList(0, pageRequest.getLimit());
-                }
-            }
-        } else {
-            // Không có cursor, lấy trang đầu tiên theo category
-            posts = postMapper.findByCategory(category, null, null, limit);
-
-            hasNext = posts.size() > pageRequest.getLimit();
-            hasPrevious = false;
-
-            if (hasNext) {
-                posts = posts.subList(0, pageRequest.getLimit());
+                cursorId = ((Number) cursorData.get("id")).longValue();
+                cursorCreatedAt = (Date) cursorData.get("createdAt");
             }
         }
 
-        // Tạo nextCursor và previousCursor
-        String nextCursor = null;
-        String previousCursor = null;
+        // Tạo các suppliers cho truy vấn by category
+        final Long finalCursorId = cursorId;
+        final Date finalCursorCreatedAt = cursorCreatedAt;
+        final int finalLimit = limit;
+        final String finalCategory = category;
 
-        if (!posts.isEmpty()) {
-            Post firstPost = posts.get(0);
-            Post lastPost = posts.get(posts.size() - 1);
-
-            if (hasNext) {
-                nextCursor = cursorUtils.encodeCursor(lastPost, cursorFieldsExtractor);
-            }
-
-            if (hasPrevious) {
-                previousCursor = cursorUtils.encodeCursor(firstPost, cursorFieldsExtractor);
-            }
-        }
-
-        return new CursorPageResponse<>(posts, nextCursor, previousCursor, hasNext, hasPrevious);
+        return CursorUtils.handlePagination(
+                pageRequest,
+                // First page supplier
+                () -> postMapper.findByCategoryFirstPage(finalCategory, finalLimit),
+                // Next page supplier
+                () -> postMapper.findByCategoryNextPage(finalCategory, finalCursorId, finalCursorCreatedAt, finalLimit),
+                // Previous page supplier
+                () -> postMapper.findByCategoryPreviousPage(finalCategory, finalCursorId, finalCursorCreatedAt, finalLimit),
+                // Check has previous supplier
+                () -> postMapper.checkHasPreviousCategory(finalCategory, finalCursorId, finalCursorCreatedAt),
+                // Cursor fields extractor
+                cursorFieldsExtractor
+        );
     }
 
     @Override
-    public CursorPageResponse<Post> getPostsWithFilters(String category, Long userId,
+    public CursorPageResponse<Post> getPostsWithFilters(String title, String category, Long userId,
                                                         Date startDate, Date endDate, CursorPageRequest pageRequest) {
-        // Xử lý input
-        if (pageRequest.getLimit() == null || pageRequest.getLimit() <= 0) {
-            pageRequest.setLimit(10);
-        }
+        // Xử lý input và tạo limit với +1 để kiểm tra trang tiếp theo
+        int limit = (pageRequest.getLimit() != null && pageRequest.getLimit() > 0)
+                ? pageRequest.getLimit() + 1 : 11;
 
-        // Tăng limit thêm 1 để kiểm tra có trang tiếp theo không
-        int limit = pageRequest.getLimit() + 1;
-
-        List<Post> posts;
-        boolean hasNext = false;
-        boolean hasPrevious = false;
-        CursorUtils<Post> cursorUtils = new CursorUtils<>();
-
-        // Định nghĩa hàm extractor để lấy các trường cần thiết từ Post entity
-        Function<Post, Map<String, Object>> cursorFieldsExtractor = post -> {
-            Map<String, Object> cursorFields = new HashMap<>();
-            cursorFields.put("id", post.getId());
-            cursorFields.put("createdAt", post.getCreatedAt());
-            return cursorFields;
-        };
-
-        // Tạo transformer cho trường createdAt
-        Map<String, Function<Object, Object>> transformers = CursorUtils.createDateTransformers("createdAt");
-
-        // Xử lý cursor nếu có
-        Long lastId = null;
-        Date lastCreatedAt = null;
+        // Giải mã cursor nếu có
+        Long cursorId = null;
+        Date cursorCreatedAt = null;
 
         if (pageRequest.getCursor() != null) {
+            CursorUtils<Post> cursorUtils = new CursorUtils<>();
+            Map<String, Function<Object, Object>> transformers = CursorUtils.createDateTransformers("createdAt");
             Map<String, Object> cursorData = cursorUtils.decodeCursor(pageRequest.getCursor(), transformers);
 
             if (cursorData != null) {
-                lastId = ((Number) cursorData.get("id")).longValue();
-                lastCreatedAt = (Date) cursorData.get("createdAt");
+                cursorId = ((Number) cursorData.get("id")).longValue();
+                cursorCreatedAt = (Date) cursorData.get("createdAt");
             }
         }
 
-        // Lấy posts với các điều kiện lọc
-        posts = postMapper.findWithFilters(category, userId, startDate, endDate,
-                lastId, lastCreatedAt, limit);
+        // Tạo các suppliers cho truy vấn với nhiều điều kiện lọc
+        final Long finalCursorId = cursorId;
+        final Date finalCursorCreatedAt = cursorCreatedAt;
+        final int finalLimit = limit;
 
-        // Kiểm tra có trang tiếp theo không
-        hasNext = posts.size() > pageRequest.getLimit();
-
-        // Kiểm tra có trang trước không
-        hasPrevious = lastId != null && lastCreatedAt != null;
-
-        // Loại bỏ phần tử thừa nếu có
-        if (hasNext) {
-            posts = posts.subList(0, pageRequest.getLimit());
-        }
-
-        // Tạo nextCursor và previousCursor
-        String nextCursor = null;
-        String previousCursor = null;
-
-        if (!posts.isEmpty()) {
-            Post firstPost = posts.get(0);
-            Post lastPost = posts.get(posts.size() - 1);
-
-            if (hasNext) {
-                nextCursor = cursorUtils.encodeCursor(lastPost, cursorFieldsExtractor);
-            }
-
-            if (hasPrevious) {
-                previousCursor = cursorUtils.encodeCursor(firstPost, cursorFieldsExtractor);
-            }
-        }
-
-        return new CursorPageResponse<>(posts, nextCursor, previousCursor, hasNext, hasPrevious);
+        return CursorUtils.handlePagination(
+                pageRequest,
+                // First page supplier
+                () -> postMapper.findWithFiltersFirstPage(title, category, userId, startDate, endDate, finalLimit),
+                // Next page supplier
+                () -> postMapper.findWithFiltersNextPage(title, category, userId, startDate, endDate,
+                        finalCursorId, finalCursorCreatedAt, finalLimit),
+                // Previous page supplier
+                () -> postMapper.findWithFiltersPreviousPage(title, category, userId, startDate, endDate,
+                        finalCursorId, finalCursorCreatedAt, finalLimit),
+                // Check has previous supplier
+                () -> postMapper.checkHasPreviousFilters(title, category, userId, startDate, endDate,
+                        finalCursorId, finalCursorCreatedAt),
+                // Cursor fields extractor
+                cursorFieldsExtractor
+        );
     }
 }

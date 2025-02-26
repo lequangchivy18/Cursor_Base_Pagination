@@ -31,7 +31,7 @@ public interface PostService {
      * @param pageRequest Thông tin request pagination
      * @return Kết quả phân trang
      */
-    CursorPageResponse<Post> getPostsWithFilters(String category, Long userId,
+    CursorPageResponse<Post> getPostsWithFilters(String title, String category, Long userId,
                                                  Date startDate, Date endDate,
                                                  CursorPageRequest pageRequest);
 }
