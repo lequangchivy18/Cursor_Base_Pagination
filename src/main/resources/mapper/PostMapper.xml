@@ -81,35 +81,6 @@
             LIMIT 1
     </select>
 
-    <!-- Lấy trang đầu tiên với filter category -->
-    <select id="findByCategoryFirstPage" resultMap="PostResultMap">
-        SELECT id, title, content, created_at, user_id, category
-        FROM posts
-        WHERE category = #{category}
-        ORDER BY created_at DESC, id DESC
-            LIMIT #{limit}
-    </select>
-
-    <!-- Lấy trang tiếp theo với filter category -->
-    <select id="findByCategoryNextPage" resultMap="PostResultMap">
-        SELECT id, title, content, created_at, user_id, category
-        FROM posts
-        WHERE category = #{category}
-        <include refid="baseCursor" />
-        ORDER BY created_at DESC, id DESC
-        LIMIT #{limit}
-    </select>
-
-    <!-- Lấy trang trước đó với filter category -->
-    <select id="findByCategoryPreviousPage" resultMap="PostResultMap">
-        SELECT id, title, content, created_at, user_id, category
-        FROM posts
-        WHERE category = #{category}
-        <include refid="previousCursor" />
-        ORDER BY created_at ASC, id ASC
-        LIMIT #{limit}
-    </select>
-
     <!-- Lấy trang đầu tiên với nhiều điều kiện phức tạp -->
     <select id="findWithFiltersFirstPage" resultMap="PostResultMap">
         SELECT id, title, content, created_at, user_id, category
@@ -137,15 +108,6 @@
         <include refid="previousCursor" />
         ORDER BY created_at ASC, id ASC
         LIMIT #{limit}
-    </select>
-
-    <!-- Kiểm tra xem có trang trước cho category không -->
-    <select id="checkHasPreviousCategory" resultType="Integer">
-        SELECT COUNT(*)
-        FROM posts
-        WHERE category = #{category}
-        <include refid="previousCursor" />
-        LIMIT 1
     </select>
 
     <!-- Kiểm tra xem có trang trước cho filters không -->

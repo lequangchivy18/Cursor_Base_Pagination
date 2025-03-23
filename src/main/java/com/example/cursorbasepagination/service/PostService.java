@@ -15,14 +15,6 @@ public interface PostService {
     CursorPageResponse<Post> getPosts(CursorPageRequest pageRequest);
 
     /**
-     * Lấy danh sách bài viết theo category với phân trang
-     * @param category Category cần lọc
-     * @param pageRequest Thông tin request pagination
-     * @return Kết quả phân trang
-     */
-    CursorPageResponse<Post> getPostsByCategory(String category, CursorPageRequest pageRequest);
-
-    /**
      * Lấy danh sách bài viết với nhiều điều kiện lọc
      * @param category Category cần lọc (có thể null)
      * @param userId ID của người dùng (có thể null)

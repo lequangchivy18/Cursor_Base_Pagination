@@ -69,48 +69,6 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public CursorPageResponse<Post> getPostsByCategory(String category, CursorPageRequest pageRequest) {
-        // Xử lý input và tạo limit với +1 để kiểm tra trang tiếp theo
-        int limit = (pageRequest.getLimit() != null && pageRequest.getLimit() > 0)
-                ? pageRequest.getLimit() + 1 : 11;
-
-        // Giải mã cursor nếu có
-        Long cursorId = null;
-        Date cursorCreatedAt = null;
-
-        if (pageRequest.getCursor() != null) {
-            CursorUtils<Post> cursorUtils = new CursorUtils<>();
-            Map<String, Function<Object, Object>> transformers = CursorUtils.createDateTransformers("createdAt");
-            Map<String, Object> cursorData = cursorUtils.decodeCursor(pageRequest.getCursor(), transformers);
-
-            if (cursorData != null) {
-                cursorId = ((Number) cursorData.get("id")).longValue();
-                cursorCreatedAt = (Date) cursorData.get("createdAt");
-            }
-        }
-
-        // Tạo các suppliers cho truy vấn by category
-        final Long finalCursorId = cursorId;
-        final Date finalCursorCreatedAt = cursorCreatedAt;
-        final int finalLimit = limit;
-        final String finalCategory = category;
-
-        return CursorUtils.handlePagination(
-                pageRequest,
-                // First page supplier
-                () -> postMapper.findByCategoryFirstPage(finalCategory, finalLimit),
-                // Next page supplier
-                () -> postMapper.findByCategoryNextPage(finalCategory, finalCursorId, finalCursorCreatedAt, finalLimit),
-                // Previous page supplier
-                () -> postMapper.findByCategoryPreviousPage(finalCategory, finalCursorId, finalCursorCreatedAt, finalLimit),
-                // Check has previous supplier
-                () -> postMapper.checkHasPreviousCategory(finalCategory, finalCursorId, finalCursorCreatedAt),
-                // Cursor fields extractor
-                cursorFieldsExtractor
-        );
-    }
-
-    @Override
     public CursorPageResponse<Post> getPostsWithFilters(String title, String category, Long userId,
                                                         Date startDate, Date endDate, CursorPageRequest pageRequest) {
         // Xử lý input và tạo limit với +1 để kiểm tra trang tiếp theo

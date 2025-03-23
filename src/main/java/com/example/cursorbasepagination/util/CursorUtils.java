@@ -3,6 +3,8 @@ package com.example.cursorbasepagination.util;
 import com.example.cursorbasepagination.dto.request.CursorPageRequest;
 import com.example.cursorbasepagination.dto.response.CursorPageResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
+
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
@@ -12,6 +14,7 @@ import java.util.function.Supplier;
  * Lớp tiện ích cho phân trang dựa trên cursor.
  * @param <T> Kiểu dữ liệu của entity đang được phân trang
  */
+@Slf4j
 public class CursorUtils<T> {
     // ObjectMapper dùng để chuyển đổi giữa đối tượng Java và JSON
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -38,6 +41,7 @@ public class CursorUtils<T> {
             return Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
             // Nếu có lỗi, ném ra RuntimeException với thông báo chi tiết
+            log.error(e.getMessage(), e);
             throw new RuntimeException("Không thể mã hóa cursor", e);
         }
     }
@@ -81,6 +85,7 @@ public class CursorUtils<T> {
             return cursorMap;
         } catch (Exception e) {
             // Nếu có lỗi, ném ra RuntimeException với thông báo chi tiết
+            log.error(e.getMessage(), e);
             throw new RuntimeException("Không thể giải mã cursor", e);
         }
     }

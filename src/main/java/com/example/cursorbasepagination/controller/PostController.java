@@ -37,24 +37,6 @@ public class PostController {
     }
 
     /**
-     * Lấy bài viết được lọc theo danh mục với phân trang dựa trên con trỏ.
-     */
-    @GetMapping("/category/{category}")
-    public CursorPageResponse<Post> getPostsByCategory(
-            @PathVariable String category,
-            @RequestParam(required = false) String cursor,
-            @RequestParam(required = false, defaultValue = "10") Integer limit,
-            @RequestParam(required = false, defaultValue = "NEXT") CursorPageRequest.PaginationDirection direction) {
-
-        CursorPageRequest pageRequest = new CursorPageRequest();
-        pageRequest.setCursor(cursor);
-        pageRequest.setLimit(limit);
-        pageRequest.setDirection(direction);
-
-        return postService.getPostsByCategory(category, pageRequest);
-    }
-
-    /**
      * Lấy bài viết với nhiều điều kiện lọc và phân trang dựa trên con trỏ.
      */
     @GetMapping("/filter")
